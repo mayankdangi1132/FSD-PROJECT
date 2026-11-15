@@ -24,17 +24,6 @@ const protect = async (req, res, next) => {
   }
 };
 
-// public route, but if a valid token is sent we still want to know who it is
-const optionalAuth = async (req, res, next) => {
-  try {
-    const user = await getUserFromToken(req);
-    if (user && user.isActive) req.user = user;
-  } catch (err) {
-    // bad token on a public route - just treat as a normal visitor
-  }
-  next();
-};
-
 const allowRoles = (...roles) => (req, res, next) => {
   if (!req.user || !roles.includes(req.user.role)) {
     return res.status(403).json({ message: 'You do not have permission to do this' });
@@ -42,4 +31,4 @@ const allowRoles = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { protect, optionalAuth, allowRoles };
+module.exports = { protect, allowRoles };

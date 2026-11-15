@@ -6,6 +6,6 @@ const router = express.Router();
 
 router.get('/admin', protect, allowRoles('admin'), getAdminStats);
 router.get('/organizer', protect, allowRoles('club', 'department'), getOrganizerStats);
-router.get('/student', getStudentDashboard);
+router.get('/student', protect, getStudentDashboard);
 
 module.exports = router;

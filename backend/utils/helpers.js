@@ -4,6 +4,15 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// if COLLEGE_EMAIL_DOMAIN is set (e.g. college.edu) every account must use an email from that domain.
+// this is what keeps people outside the college from signing up.
+const checkCollegeEmail = (email) => {
+  if (!EMAIL_REGEX.test(email)) return 'Please enter a valid email';
+  const domain = process.env.COLLEGE_EMAIL_DOMAIN;
+  if (domain && !email.endsWith('@' + domain)) return `Please use an official college email (@${domain})`;
+  return null;
+};
+
 // today's date as YYYY-MM-DD (server local time)
 const todayStr = () => {
   const d = new Date();
@@ -77,6 +86,7 @@ const handleError = (res, err) => {
 module.exports = {
   CATEGORIES,
   EMAIL_REGEX,
+  checkCollegeEmail,
   todayStr,
   isCompleted,
   validateEvent,

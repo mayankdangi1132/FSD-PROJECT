@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import API from '../api';
+import { useAuth, dashboardPath } from '../context/AuthContext';
 import EventCard from '../components/EventCard';
 import { CATEGORIES } from '../utils/helpers';
 
@@ -15,15 +16,18 @@ const categoryIcons = {
 };
 
 const Home = () => {
+  const { user } = useAuth();
   const [upcoming, setUpcoming] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // events are only for logged in college members, so don't even ask the API otherwise
   useEffect(() => {
+    if (!user) return;
     API.get('/dashboard/student')
       .then((res) => setUpcoming(res.data.upcoming.slice(0, 3)))
       .catch(() => setUpcoming([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   return (
     <>
@@ -41,23 +45,40 @@ const Home = () => {
               calendar, see event details and find out who won.
             </p>
             <div className="hero-buttons">
-              <Link to="/events" className="btn btn-accent">
-                Explore Events
-              </Link>
-              <Link to="/calendar" className="btn btn-light">
-                Open Calendar
-              </Link>
+              {user ? (
+                <>
+                  <Link to="/events" className="btn btn-accent">
+                    Explore Events
+                  </Link>
+                  <Link to="/calendar" className="btn btn-light">
+                    Open Calendar
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className="btn btn-accent">
+                    Login
+                  </Link>
+                  <Link to="/register" className="btn btn-light">
+                    Student Sign Up
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
           <div className="hero-card">
             <h3>For Students</h3>
-            <p>No login needed. Browse events, filter by club or category and check results.</p>
-            <Link to="/student">Go to student dashboard →</Link>
+            <p>Sign up with your official college email to see all events, the calendar and results.</p>
+            {user ? (
+              <Link to={dashboardPath(user)}>Go to my dashboard →</Link>
+            ) : (
+              <Link to="/register">Create student account →</Link>
+            )}
             <hr />
             <h3>For Clubs &amp; Departments</h3>
             <p>Use the official college email given by the admin to publish and manage your events.</p>
-            <Link to="/login">Organizer login →</Link>
+            {!user && <Link to="/login">Organizer login →</Link>}
           </div>
         </div>
       </section>
@@ -65,9 +86,22 @@ const Home = () => {
       <section className="section container">
         <div className="section-head">
           <h2>Upcoming Events</h2>
-          <Link to="/events">View all</Link>
+          {user && <Link to="/events">View all</Link>}
         </div>
-        {loading ? (
+        {!user ? (
+          <div className="locked-box">
+            <h3>🔒 Events are only for our college</h3>
+            <p>Log in with your college account to see upcoming events, the calendar and results.</p>
+            <div className="hero-buttons">
+              <Link to="/login" className="btn btn-primary">
+                Login
+              </Link>
+              <Link to="/register" className="btn btn-outline">
+                Student Sign Up
+              </Link>
+            </div>
+          </div>
+        ) : loading ? (
           <p className="loading">Loading events...</p>
         ) : upcoming.length === 0 ? (
           <p className="empty">No upcoming events right now. Check back soon!</p>

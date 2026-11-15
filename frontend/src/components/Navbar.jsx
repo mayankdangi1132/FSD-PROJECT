@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth, dashboardPath } from '../context/AuthContext';
+import ThemeToggle from './ThemeToggle';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -25,10 +26,6 @@ const Navbar = () => {
           </span>
         </Link>
 
-        <button className="menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
-          {menuOpen ? '✕' : '☰'}
-        </button>
-
         <nav className={menuOpen ? 'nav-links open' : 'nav-links'}>
           <NavLink to="/" end onClick={closeMenu}>
             Home
@@ -45,20 +42,34 @@ const Navbar = () => {
           <NavLink to="/departments" onClick={closeMenu}>
             Departments
           </NavLink>
-          <NavLink to={dashboardPath(user)} onClick={closeMenu}>
-            Dashboard
-          </NavLink>
 
           {user ? (
-            <button className="btn btn-outline btn-sm" onClick={handleLogout}>
-              Logout
-            </button>
+            <>
+              <NavLink to={dashboardPath(user)} onClick={closeMenu}>
+                Dashboard
+              </NavLink>
+              <button className="btn btn-outline btn-sm" onClick={handleLogout}>
+                Logout
+              </button>
+            </>
           ) : (
-            <Link to="/login" className="btn btn-primary btn-sm" onClick={closeMenu}>
-              Login
-            </Link>
+            <>
+              <Link to="/login" className="btn btn-outline btn-sm" onClick={closeMenu}>
+                Login
+              </Link>
+              <Link to="/register" className="btn btn-primary btn-sm" onClick={closeMenu}>
+                Sign Up
+              </Link>
+            </>
           )}
         </nav>
+
+        <div className="nav-actions">
+          <ThemeToggle />
+          <button className="menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
+            {menuOpen ? '✕' : '☰'}
+          </button>
+        </div>
       </div>
     </header>
   );

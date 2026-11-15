@@ -10,19 +10,19 @@ const {
   updateEventStatus,
   updateWinners,
 } = require('../controllers/eventController');
-const { protect, optionalAuth, allowRoles } = require('../middleware/auth');
+const { protect, allowRoles } = require('../middleware/auth');
 
 const router = express.Router();
 const organizers = allowRoles('admin', 'club', 'department');
 
-// public
-router.get('/', getEvents);
+// any logged in user (students, organizers, admin)
+router.get('/', protect, getEvents);
 
 // these two must come before /:id
 router.get('/mine', protect, organizers, getMyEvents);
 router.get('/admin/all', protect, allowRoles('admin'), getAllEventsForAdmin);
 
-router.get('/:id', optionalAuth, getEventById);
+router.get('/:id', protect, getEventById);
 
 // organizers + admin (ownership is checked inside the controller)
 router.post('/', protect, organizers, createEvent);

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import API, { getError } from '../api';
+import { useAuth } from '../context/AuthContext';
 import EventCard from '../components/EventCard';
 import EventCalendar from '../components/EventCalendar';
 import { formatDate, ordinal } from '../utils/helpers';
 
 const StudentDashboard = () => {
+  const { user } = useAuth();
   const [data, setData] = useState({ upcoming: [], recent: [], recentWinners: [] });
   const [allEvents, setAllEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +28,7 @@ const StudentDashboard = () => {
   return (
     <div className="container page">
       <div className="page-head">
-        <h1>Student Dashboard</h1>
+        <h1>{user.role === 'student' ? `Hi, ${user.name.split(' ')[0]}` : 'Student Dashboard'}</h1>
         <p>What's coming up on campus and the latest results.</p>
       </div>
 

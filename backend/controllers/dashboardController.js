@@ -11,9 +11,10 @@ const countByTime = (events) => {
 // GET /api/dashboard/admin
 const getAdminStats = async (req, res) => {
   try {
-    const [clubs, departments, events, pending] = await Promise.all([
+    const [clubs, departments, students, events, pending] = await Promise.all([
       User.countDocuments({ role: 'club' }),
       User.countDocuments({ role: 'department' }),
+      User.countDocuments({ role: 'student' }),
       Event.find().select('endDate endTime'),
       Event.countDocuments({ status: 'pending' }),
     ]);
@@ -21,6 +22,7 @@ const getAdminStats = async (req, res) => {
     res.json({
       totalClubs: clubs,
       totalDepartments: departments,
+      totalStudents: students,
       totalEvents: events.length,
       ...countByTime(events),
       pending,
@@ -49,7 +51,7 @@ const getOrganizerStats = async (req, res) => {
   }
 };
 
-// GET /api/dashboard/student  (public)
+// GET /api/dashboard/student  (any logged in user)
 const getStudentDashboard = async (req, res) => {
   try {
     const upcomingList = await Event.find({ status: 'approved', endDate: { $gte: todayStr() } })

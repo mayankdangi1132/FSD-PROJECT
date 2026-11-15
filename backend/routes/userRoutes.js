@@ -2,8 +2,9 @@ const express = require('express');
 const {
   getOrganizers,
   createOrganizer,
-  updateOrganizer,
-  deleteOrganizer,
+  getStudents,
+  updateUser,
+  deleteUser,
 } = require('../controllers/userController');
 const { protect, allowRoles } = require('../middleware/auth');
 
@@ -13,6 +14,7 @@ const router = express.Router();
 router.use(protect, allowRoles('admin'));
 
 router.route('/').get(getOrganizers).post(createOrganizer);
-router.route('/:id').put(updateOrganizer).delete(deleteOrganizer);
+router.get('/students', getStudents);
+router.route('/:id').put(updateUser).delete(deleteUser);
 
 module.exports = router;

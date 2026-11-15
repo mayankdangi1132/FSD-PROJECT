@@ -1,14 +1,6 @@
 const User = require('../models/User');
 const Event = require('../models/Event');
-const { EMAIL_REGEX, handleError } = require('../utils/helpers');
-
-// if COLLEGE_EMAIL_DOMAIN is set (e.g. college.edu) every organizer email must use it
-const checkCollegeEmail = (email) => {
-  if (!EMAIL_REGEX.test(email)) return 'Please enter a valid email';
-  const domain = process.env.COLLEGE_EMAIL_DOMAIN;
-  if (domain && !email.endsWith('@' + domain)) return `Organizer email must be an official @${domain} address`;
-  return null;
-};
+const { checkCollegeEmail, handleError } = require('../utils/helpers');
 
 // counts events per organizer, returns { organizerId: count }
 const getEventCounts = async (match = {}) => {
@@ -59,11 +51,21 @@ const createOrganizer = async (req, res) => {
   }
 };
 
-// PUT /api/users/:id  (admin)
-const updateOrganizer = async (req, res) => {
+// GET /api/users/students  (admin)
+const getStudents = async (req, res) => {
+  try {
+    const students = await User.find({ role: 'student' }).sort({ createdAt: -1 });
+    res.json(students);
+  } catch (err) {
+    handleError(res, err);
+  }
+};
+
+// PUT /api/users/:id  (admin) - works for organizers and students (e.g. to disable an account)
+const updateUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user || user.role === 'admin') return res.status(404).json({ message: 'Organizer not found' });
+    if (!user || user.role === 'admin') return res.status(404).json({ message: 'Account not found' });
 
     const { name, role, description, isActive } = req.body;
     const password = req.body.password ? String(req.body.password) : '';
@@ -78,7 +80,7 @@ const updateOrganizer = async (req, res) => {
       if (!String(name).trim()) return res.status(400).json({ message: 'Name cannot be empty' });
       user.name = String(name).trim();
     }
-    if (role !== undefined) {
+    if (role !== undefined && user.role !== 'student') {
       if (!['club', 'department'].includes(role)) return res.status(400).json({ message: 'Role must be club or department' });
       user.role = role;
     }
@@ -92,7 +94,9 @@ const updateOrganizer = async (req, res) => {
     await user.save();
 
     // keep the name/type shown on their events in sync
-    await Event.updateMany({ organizer: user._id }, { organizerName: user.name, organizerType: user.role });
+    if (user.role !== 'student') {
+      await Event.updateMany({ organizer: user._id }, { organizerName: user.name, organizerType: user.role });
+    }
 
     res.json(user);
   } catch (err) {
@@ -101,20 +105,20 @@ const updateOrganizer = async (req, res) => {
 };
 
 // DELETE /api/users/:id  (admin) - also removes that organizer's events
-const deleteOrganizer = async (req, res) => {
+const deleteUser = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user || user.role === 'admin') return res.status(404).json({ message: 'Organizer not found' });
+    if (!user || user.role === 'admin') return res.status(404).json({ message: 'Account not found' });
 
     await Event.deleteMany({ organizer: user._id });
     await user.deleteOne();
-    res.json({ message: 'Organizer and their events deleted' });
+    res.json({ message: 'Account deleted' });
   } catch (err) {
     handleError(res, err);
   }
 };
 
-// GET /api/organizers?role=club  (public) - used for Clubs / Departments pages and filters
+// GET /api/organizers?role=club  (any logged in user) - used for Clubs / Departments pages and filters
 const getPublicOrganizers = async (req, res) => {
   try {
     const filter = { role: { $in: ['club', 'department'] }, isActive: true };
@@ -128,4 +132,4 @@ const getPublicOrganizers = async (req, res) => {
   }
 };
 
-module.exports = { getOrganizers, createOrganizer, updateOrganizer, deleteOrganizer, getPublicOrganizers };
+module.exports = { getOrganizers, createOrganizer, getStudents, updateUser, deleteUser, getPublicOrganizers };

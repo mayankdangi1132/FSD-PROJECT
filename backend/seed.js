@@ -66,6 +66,24 @@ const seed = async () => {
     description: 'Electronics and Communication Engineering department.',
   });
 
+  // sample students (in real use students sign up themselves with their college email)
+  await User.create({
+    name: 'Priya Sharma',
+    email: 'priya@college.edu',
+    password: 'student123',
+    role: 'student',
+    usn: '1XX23CS045',
+    department: 'CSE',
+  });
+  await User.create({
+    name: 'Arjun Nair',
+    email: 'arjun@college.edu',
+    password: 'student123',
+    role: 'student',
+    usn: '1XX23EC012',
+    department: 'ECE',
+  });
+
   const by = (user) => ({
     organizer: user._id,
     organizerName: user.name,
@@ -257,6 +275,7 @@ const seed = async () => {
   console.log(`  Admin       : ${admin.email} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
   console.log('  Clubs       : codingclub@college.edu, culturalclub@college.edu, sportsclub@college.edu / club123');
   console.log('  Departments : cse@college.edu, ece@college.edu / dept123');
+  console.log('  Students    : priya@college.edu, arjun@college.edu / student123');
 
   await mongoose.disconnect();
 };

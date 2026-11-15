@@ -1,6 +1,6 @@
 # Campus Connect - College Event Management & Calendar Portal
 
-Campus Connect is a MERN stack web app where all clubs, departments and the college administration publish their events in one place. Students can browse every event on a calendar, see full details and check the winners of competitions.
+Campus Connect is a MERN stack web app where all clubs, departments and the college administration publish their events in one place. Students log in to browse every event on a calendar, see full details and check the winners of competitions.
 
 ## Features
 
@@ -19,11 +19,17 @@ Campus Connect is a MERN stack web app where all clubs, departments and the coll
 - Add winners (position, name, USN, department, semester, team name, photo) after a competitive event is over.
 - Dashboard with total / upcoming / completed events and a reminder for competitions that still need winners.
 
-**Students** (no login needed)
+**Students** (must log in - only people from the college can see events)
+- Sign up with an official college email (e.g. `name@college.edu`) and USN. Other emails are rejected.
 - Browse all events, search by name and filter by club, department, category, date, upcoming or completed.
 - Calendar with month, week and day views. Each organizer type has its own colour, today is highlighted and completed events are faded.
 - Event details page with poster, timings, venue, contacts and a Winners section for competitive events.
 - Student dashboard with upcoming events, a calendar, recently added events and recently published winners.
+
+## Other
+
+- Light and dark mode (button in the navbar, remembers your choice).
+- Admin can see, disable or delete student accounts.
 
 ## Tech Stack
 
@@ -103,6 +109,7 @@ Open `http://localhost:5173`. Vite forwards `/api` requests to the backend, so n
 | Club | sportsclub@college.edu | club123 |
 | Department | cse@college.edu | dept123 |
 | Department | ece@college.edu | dept123 |
+| Student | priya@college.edu | student123 |
 
 Change these passwords if you deploy the project anywhere.
 
@@ -123,6 +130,7 @@ Change these passwords if you deploy the project anywhere.
 
 | Method | Endpoint | Access |
 | --- | --- | --- |
+| POST | `/api/auth/register` | Public (students, college email only) |
 | POST | `/api/auth/login` | Public |
 | GET | `/api/auth/me` | Logged in |
 | GET | `/api/events` | Public (filters: `search`, `organizer`, `category`, `date`, `when=upcoming/completed`) |

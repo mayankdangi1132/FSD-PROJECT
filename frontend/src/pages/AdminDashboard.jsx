@@ -8,6 +8,7 @@ const emptyForm = { name: '', email: '', password: '', role: 'club', description
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [organizers, setOrganizers] = useState([]);
+  const [students, setStudents] = useState([]);
   const [events, setEvents] = useState([]);
   const [tab, setTab] = useState('organizers');
   const [statusFilter, setStatusFilter] = useState('');
@@ -19,9 +20,10 @@ const AdminDashboard = () => {
   const loadStats = () => API.get('/dashboard/admin').then((res) => setStats(res.data));
   const loadOrganizers = () => API.get('/users').then((res) => setOrganizers(res.data));
   const loadEvents = () => API.get('/events/admin/all').then((res) => setEvents(res.data));
+  const loadStudents = () => API.get('/users/students').then((res) => setStudents(res.data));
 
   useEffect(() => {
-    Promise.all([loadStats(), loadOrganizers(), loadEvents()]).catch((err) =>
+    Promise.all([loadStats(), loadOrganizers(), loadEvents(), loadStudents()]).catch((err) =>
       setMessage({ type: 'error', text: getError(err) })
     );
   }, []);
@@ -61,10 +63,22 @@ const AdminDashboard = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const toggleActive = async (org) => {
+  // enable / disable works the same for organizers and students
+  const toggleActive = async (account) => {
     try {
-      await API.put(`/users/${org._id}`, { isActive: !org.isActive });
-      loadOrganizers();
+      await API.put(`/users/${account._id}`, { isActive: !account.isActive });
+      account.role === 'student' ? loadStudents() : loadOrganizers();
+    } catch (err) {
+      alert(getError(err));
+    }
+  };
+
+  const deleteStudent = async (student) => {
+    if (!window.confirm(`Delete the account of ${student.name}?`)) return;
+    try {
+      await API.delete(`/users/${student._id}`);
+      loadStudents();
+      loadStats();
     } catch (err) {
       alert(getError(err));
     }
@@ -126,6 +140,9 @@ const AdminDashboard = () => {
             <b>{stats.totalDepartments}</b>Departments
           </div>
           <div className="stat">
+            <b>{stats.totalStudents}</b>Students
+          </div>
+          <div className="stat">
             <b>{stats.totalEvents}</b>Total Events
           </div>
           <div className="stat">
@@ -145,6 +162,9 @@ const AdminDashboard = () => {
       <div className="tabs">
         <button className={tab === 'organizers' ? 'tab active' : 'tab'} onClick={() => setTab('organizers')}>
           Organizer Accounts
+        </button>
+        <button className={tab === 'students' ? 'tab active' : 'tab'} onClick={() => setTab('students')}>
+          Students
         </button>
         <button className={tab === 'events' ? 'tab active' : 'tab'} onClick={() => setTab('events')}>
           All Events {stats?.pending > 0 && <span className="count">{stats.pending}</span>}
@@ -244,6 +264,47 @@ const AdminDashboard = () => {
             {organizers.length === 0 && <p className="empty">No organizer accounts yet.</p>}
           </div>
         </>
+      )}
+
+      {tab === 'students' && (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>USN</th>
+                <th>Department</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((s) => (
+                <tr key={s._id}>
+                  <td className="table-title">{s.name}</td>
+                  <td>{s.email}</td>
+                  <td>{s.usn}</td>
+                  <td>{s.department || '-'}</td>
+                  <td>
+                    <span className={`pill ${s.isActive ? 'approved' : 'rejected'}`}>
+                      {s.isActive ? 'Active' : 'Disabled'}
+                    </span>
+                  </td>
+                  <td className="actions">
+                    <button className="btn btn-sm btn-warning" onClick={() => toggleActive(s)}>
+                      {s.isActive ? 'Disable' : 'Enable'}
+                    </button>
+                    <button className="btn btn-sm btn-danger" onClick={() => deleteStudent(s)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {students.length === 0 && <p className="empty">No students have signed up yet.</p>}
+        </div>
       )}
 
       {tab === 'events' && (

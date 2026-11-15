@@ -10,6 +10,7 @@ import EventDetails from './pages/EventDetails';
 import CalendarPage from './pages/CalendarPage';
 import Organizers from './pages/Organizers';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import OrganizerDashboard from './pages/OrganizerDashboard';
@@ -33,13 +34,16 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/events" element={<Events />} />
-          <Route path="/events/:id" element={<EventDetails />} />
-          <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/clubs" element={<Organizers role="club" />} />
-          <Route path="/departments" element={<Organizers role="department" />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/student" element={<StudentDashboard />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* everything below needs a college account (student, organizer or admin) */}
+          <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
+          <Route path="/events/:id" element={<ProtectedRoute><EventDetails /></ProtectedRoute>} />
+          <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+          <Route path="/clubs" element={<ProtectedRoute><Organizers role="club" /></ProtectedRoute>} />
+          <Route path="/departments" element={<ProtectedRoute><Organizers role="department" /></ProtectedRoute>} />
+          <Route path="/student" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
 
           <Route
             path="/admin"

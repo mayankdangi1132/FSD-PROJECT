@@ -1,16 +1,21 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-// Only admin, clubs and departments have accounts.
-// Students can browse everything without logging in.
+// admin, club and department accounts are created by the admin.
+// students sign up themselves with their college email.
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
-    role: { type: String, enum: ['admin', 'club', 'department'], required: true },
+    role: { type: String, enum: ['admin', 'club', 'department', 'student'], required: true },
     description: { type: String, default: '' },
-    // admin can switch this off to stop a club/department from logging in and publishing
+
+    // only used for students
+    usn: { type: String, default: '', uppercase: true, trim: true },
+    department: { type: String, default: '', trim: true },
+
+    // admin can switch this off to block an account from logging in
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
