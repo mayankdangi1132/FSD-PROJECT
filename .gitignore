@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+
+# secrets - never push these, use .env.example instead
+.env
+
+# build output and uploaded images
+dist/
+uploads/
+
+# system / editor files
+.DS_Store
+.vscode/
+*.log
