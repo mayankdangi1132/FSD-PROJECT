@@ -1,31 +1,34 @@
-// Fills the database with an admin, a few clubs/departments and sample events.
-// Run with: npm run seed   (WARNING: deletes existing users and events)
+// DEMO DATA ONLY - fills the database with the admin, some clubs, departments, students and events.
+// Run with: npm run seed   (WARNING: deletes ALL existing users and events)
+// For a real setup use "npm run create-admin" instead and add everything from the admin dashboard.
 require('dotenv').config({ quiet: true });
 
 const mongoose = require('mongoose');
 const User = require('./models/User');
 const Event = require('./models/Event');
+const { todayStr, addDays } = require('./utils/helpers');
 
-// date string relative to today, e.g. day(-3) = 3 days ago
-const day = (offset) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const date = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${month}-${date}`;
-};
+// date string relative to today in IST, e.g. day(-3) = 3 days ago
+const day = (offset) => addDays(todayStr(), offset);
 
 const seed = async () => {
+  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+    console.error('Please set ADMIN_EMAIL and ADMIN_PASSWORD in backend/.env first');
+    process.exit(1);
+  }
+
   await mongoose.connect(process.env.MONGO_URI);
   console.log('Connected to MongoDB');
 
   await Event.deleteMany();
   await User.deleteMany();
+  await User.syncIndexes();
 
+  // admin comes from .env (password is hashed by the User model)
   const admin = await User.create({
-    name: 'College Administration',
-    email: process.env.ADMIN_EMAIL || 'admin@college.edu',
-    password: process.env.ADMIN_PASSWORD || 'admin123',
+    name: process.env.ADMIN_NAME || 'College Administration',
+    email: process.env.ADMIN_EMAIL,
+    password: process.env.ADMIN_PASSWORD,
     role: 'admin',
   });
 
@@ -66,14 +69,15 @@ const seed = async () => {
     description: 'Electronics and Communication Engineering department.',
   });
 
-  // sample students (in real use students sign up themselves with their college email)
+  // sample students (normally the admin adds them from the dashboard with a temporary password)
   await User.create({
     name: 'Priya Sharma',
     email: 'priya@college.edu',
     password: 'student123',
     role: 'student',
     usn: '1XX23CS045',
-    department: 'CSE',
+    department: 'Department of CSE',
+    semester: '5',
   });
   await User.create({
     name: 'Arjun Nair',
@@ -81,13 +85,15 @@ const seed = async () => {
     password: 'student123',
     role: 'student',
     usn: '1XX23EC012',
-    department: 'ECE',
+    department: 'Department of ECE',
+    semester: '3',
   });
 
   const by = (user) => ({
     organizer: user._id,
     organizerName: user.name,
     organizerType: user.role === 'admin' ? 'college' : user.role,
+    createdBy: user._id,
     status: 'approved',
   });
 
@@ -115,12 +121,12 @@ const seed = async () => {
     {
       ...by(coding),
       title: '24 Hour Hackathon',
-      description: 'Build something useful in 24 hours. Food and wifi provided. Themes will be announced at the start.',
+      description: 'Two days of building. 9 AM to 9 PM on both days. Food and wifi provided. Themes will be announced at the start.',
       category: 'Technical',
       startDate: day(6),
       endDate: day(7),
       startTime: '09:00',
-      endTime: '09:00',
+      endTime: '21:00',
       venue: 'Main Auditorium',
       registrationLink: 'https://forms.gle/example',
       registrationDeadline: day(4),
@@ -228,6 +234,45 @@ const seed = async () => {
       winnersPublishedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
     },
     {
+      ...by(cse),
+      title: 'Resume Building Workshop',
+      description: 'Learn how to write a resume that gets shortlisted. Bring a printed copy of your current resume.',
+      category: 'Workshop',
+      startDate: day(3),
+      endDate: day(3),
+      startTime: '10:30',
+      endTime: '13:30',
+      venue: 'CSE Seminar Hall',
+      contactEmail: 'cse@college.edu',
+      eventType: 'non-competitive',
+    },
+    {
+      ...by(cultural),
+      title: 'Open Mic Night',
+      description: 'Poetry, stand-up and acoustic music. Sign up at the venue.',
+      category: 'Cultural',
+      startDate: day(5),
+      endDate: day(5),
+      startTime: '18:00',
+      endTime: '20:30',
+      venue: 'Amphitheatre',
+      contactEmail: 'culturalclub@college.edu',
+      eventType: 'non-competitive',
+      status: 'pending', // waiting for the admin, to show the approval workflow
+    },
+    {
+      ...by(admin),
+      title: 'Blood Donation Camp',
+      description: 'Organised with the city blood bank. Donors get a certificate and refreshments.',
+      category: 'Other',
+      startDate: day(4),
+      endDate: day(4),
+      allDay: true,
+      venue: 'College Health Centre',
+      contactEmail: 'admin@college.edu',
+      eventType: 'non-competitive',
+    },
+    {
       ...by(ece),
       title: 'IoT Hands-on Workshop',
       description: 'Learn to build simple IoT projects using ESP32 and sensors. Kits will be provided.',
@@ -272,7 +317,7 @@ const seed = async () => {
 
   console.log('Sample data added.\n');
   console.log('Login details:');
-  console.log(`  Admin       : ${admin.email} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
+  console.log(`  Admin       : ${admin.email} / (password from ADMIN_PASSWORD in .env)`);
   console.log('  Clubs       : codingclub@college.edu, culturalclub@college.edu, sportsclub@college.edu / club123');
   console.log('  Departments : cse@college.edu, ece@college.edu / dept123');
   console.log('  Students    : priya@college.edu, arjun@college.edu / student123');

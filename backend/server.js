@@ -11,7 +11,15 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
-connectDB();
+// older events (saved before startAt / endAt existed) get those fields filled in once
+const fillEventTimes = async () => {
+  const Event = require('./models/Event');
+  const old = await Event.find({ $or: [{ startAt: null }, { endAt: null }] });
+  for (const event of old) await event.save();
+  if (old.length) console.log(`Updated start/end times for ${old.length} old events`);
+};
+
+connectDB().then(fillEventTimes).catch((err) => console.error(err.message));
 
 const app = express();
 

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Mail, ArrowRight } from 'lucide-react';
 import API, { getError } from '../api';
-import { TYPE_COLORS } from '../utils/helpers';
+import { Loader, EmptyState } from '../components/States';
+import { TYPE_COLORS, initials } from '../utils/helpers';
 
 // same page is used for /clubs and /departments
 const Organizers = ({ role }) => {
@@ -25,32 +27,40 @@ const Organizers = ({ role }) => {
         <h1>{title}</h1>
         <p>
           {role === 'club'
-            ? 'Student clubs that organize events on campus.'
+            ? 'Student clubs that organise events on campus.'
             : 'Academic departments and the events they conduct.'}
         </p>
       </div>
 
       {error && <p className="alert error">{error}</p>}
       {loading ? (
-        <p className="loading">Loading...</p>
+        <Loader />
       ) : list.length === 0 ? (
-        <p className="empty">No {title.toLowerCase()} added yet.</p>
+        <EmptyState title={`No ${title.toLowerCase()} added yet`} />
       ) : (
         <div className="card-grid">
           {list.map((org) => (
-            <div key={org._id} className="org-card" style={{ borderLeftColor: TYPE_COLORS[role] }}>
-              <div className="org-avatar" style={{ background: TYPE_COLORS[role] }}>
-                {org.name.charAt(0)}
+            <div key={org._id} className="org-card">
+              <div className="org-card-top">
+                {org.logo ? (
+                  <img src={org.logo} alt="" className="avatar lg" />
+                ) : (
+                  <span className="avatar lg" style={{ background: TYPE_COLORS[role] }}>
+                    {initials(org.name)}
+                  </span>
+                )}
+                <span className="chip">
+                  {org.eventCount} event{org.eventCount === 1 ? '' : 's'}
+                </span>
               </div>
               <h3>{org.name}</h3>
               <p>{org.description || 'No description added.'}</p>
-              <p className="meta">✉️ {org.email}</p>
-              <div className="org-footer">
-                <span>
-                  {org.eventCount} event{org.eventCount === 1 ? '' : 's'}
-                </span>
-                <Link to={`/events?organizer=${org._id}`}>View events →</Link>
-              </div>
+              <a href={`mailto:${org.email}`} className="meta-link">
+                <Mail size={14} /> {org.email}
+              </a>
+              <Link to={`/events?organizer=${org._id}`} className="btn btn-light-blue btn-block">
+                View events <ArrowRight size={15} />
+              </Link>
             </div>
           ))}
         </div>

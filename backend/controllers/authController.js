@@ -1,55 +1,25 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { checkCollegeEmail, handleError } = require('../utils/helpers');
+const { isAuthorisedAdmin } = require('../middleware/auth');
+const { handleError } = require('../utils/helpers');
 
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-// what we send back to the frontend about the logged in user
+// what we send back to the frontend about the logged in user (never the password)
 const userInfo = (user) => ({
   _id: user._id,
   name: user.name,
   email: user.email,
   role: user.role,
+  logo: user.logo,
   usn: user.usn,
   department: user.department,
+  semester: user.semester,
+  mustChangePassword: user.mustChangePassword,
 });
 
-// POST /api/auth/register
-// Only students can sign up, and only with the college email domain.
-// Club / department accounts are still created by the admin.
-const register = async (req, res) => {
-  try {
-    const name = String(req.body.name || '').trim();
-    const email = String(req.body.email || '').toLowerCase().trim();
-    const password = String(req.body.password || '');
-    const usn = String(req.body.usn || '').trim().toUpperCase();
-    const department = String(req.body.department || '').trim();
-
-    if (!name || !email || !password || !usn) {
-      return res.status(400).json({ message: 'Name, college email, USN and password are required' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-    const emailError = checkCollegeEmail(email);
-    if (emailError) return res.status(400).json({ message: emailError });
-
-    if (await User.findOne({ email })) {
-      return res.status(400).json({ message: 'An account with this email already exists' });
-    }
-    if (await User.findOne({ usn, role: 'student' })) {
-      return res.status(400).json({ message: 'An account with this USN already exists' });
-    }
-
-    const user = await User.create({ name, email, password, usn, department, role: 'student' });
-
-    res.status(201).json({ token: generateToken(user._id), user: userInfo(user) });
-  } catch (err) {
-    handleError(res, err);
-  }
-};
-
-// POST /api/auth/login  (everyone - admin, clubs, departments and students)
+// POST /api/auth/login  (admin, clubs, departments and students)
+// There is no register route - every account is created by the admin.
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -64,6 +34,9 @@ const login = async (req, res) => {
     if (!user.isActive) {
       return res.status(403).json({ message: 'Your account has been disabled by the admin' });
     }
+    if (user.role === 'admin' && !isAuthorisedAdmin(user)) {
+      return res.status(403).json({ message: 'This admin account is not authorised' });
+    }
 
     res.json({ token: generateToken(user._id), user: userInfo(user) });
   } catch (err) {
@@ -76,4 +49,36 @@ const getMe = (req, res) => {
   res.json(userInfo(req.user));
 };
 
-module.exports = { register, login, getMe };
+// PUT /api/auth/change-password  body: { currentPassword, newPassword }
+// used by everyone, and forced after logging in with a temporary password
+const changePassword = async (req, res) => {
+  try {
+    const currentPassword = String(req.body.currentPassword || '');
+    const newPassword = String(req.body.newPassword || '');
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters' });
+    }
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ message: 'New password must be different from the current one' });
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!(await user.matchPassword(currentPassword))) {
+      return res.status(400).json({ message: 'Current password is wrong' });
+    }
+
+    user.password = newPassword;
+    user.mustChangePassword = false;
+    await user.save();
+
+    res.json({ message: 'Password changed', user: userInfo(user) });
+  } catch (err) {
+    handleError(res, err);
+  }
+};
+
+module.exports = { login, getMe, changePassword };

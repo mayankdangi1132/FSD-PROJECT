@@ -1,5 +1,6 @@
 const Event = require('../models/Event');
-const { todayStr, isCompleted, validateEvent, handleError } = require('../utils/helpers');
+const User = require('../models/User');
+const { isCompleted, validateEvent, handleError } = require('../utils/helpers');
 
 // fields an organizer is allowed to send. organizer, status and winners are set by us.
 const EVENT_FIELDS = [
@@ -11,6 +12,7 @@ const EVENT_FIELDS = [
   'endDate',
   'startTime',
   'endTime',
+  'allDay',
   'venue',
   'registrationLink',
   'registrationDeadline',
@@ -27,6 +29,7 @@ const pickEventFields = (body) => {
       data[field] = typeof body[field] === 'string' ? body[field].trim() : body[field];
     }
   });
+  if (data.allDay !== undefined) data.allDay = data.allDay === true || data.allDay === 'true';
   return data;
 };
 
@@ -37,7 +40,24 @@ const approvalRequired = () => process.env.REQUIRE_APPROVAL === 'true';
 
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// GET /api/events  (public)
+// Works out which account an event belongs to.
+// Clubs and departments always post as themselves. The admin can post as the college
+// or pick a club / department (organizerId).
+const findOwner = async (user, organizerId) => {
+  if (user.role !== 'admin' || !organizerId || organizerId === 'college') return user;
+
+  const owner = await User.findOne({ _id: organizerId, role: { $in: ['club', 'department'] } });
+  if (!owner) throw Object.assign(new Error('Please choose a valid club or department'), { status: 400 });
+  return owner;
+};
+
+const ownerFields = (owner) => ({
+  organizer: owner._id,
+  organizerName: owner.name,
+  organizerType: owner.role === 'admin' ? 'college' : owner.role,
+});
+
+// GET /api/events  (any logged in user)
 // query: search, organizer (id or "college"), category, date, when=upcoming|completed
 const getEvents = async (req, res) => {
   try {
@@ -61,23 +81,18 @@ const getEvents = async (req, res) => {
       filter.endDate = { $gte: date };
     }
 
-    const today = todayStr();
-    if (when === 'upcoming') filter.endDate = { ...filter.endDate, $gte: today };
-    if (when === 'completed') filter.endDate = { ...filter.endDate, $lte: today };
+    const now = new Date();
+    if (when === 'upcoming') filter.endAt = { $gte: now };
+    if (when === 'completed') filter.endAt = { $lt: now };
 
-    let events = await Event.find(filter).sort({ startDate: when === 'completed' ? -1 : 1, startTime: 1 });
-
-    // the date check above is only day level, this fixes events that end later/earlier today
-    if (when === 'upcoming') events = events.filter((e) => !isCompleted(e));
-    if (when === 'completed') events = events.filter((e) => isCompleted(e));
-
+    const events = await Event.find(filter).sort({ startAt: when === 'completed' ? -1 : 1 });
     res.json(events);
   } catch (err) {
     handleError(res, err);
   }
 };
 
-// GET /api/events/:id  (public, but pending/rejected events only visible to owner or admin)
+// GET /api/events/:id  (pending / rejected events are only visible to their owner or the admin)
 const getEventById = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -95,7 +110,7 @@ const getEventById = async (req, res) => {
 // GET /api/events/mine  (club / department / admin)
 const getMyEvents = async (req, res) => {
   try {
-    const events = await Event.find({ organizer: req.user._id }).sort({ startDate: -1 });
+    const events = await Event.find({ organizer: req.user._id }).sort({ startAt: -1 });
     res.json(events);
   } catch (err) {
     handleError(res, err);
@@ -107,7 +122,7 @@ const getAllEventsForAdmin = async (req, res) => {
   try {
     const filter = {};
     if (['pending', 'approved', 'rejected'].includes(req.query.status)) filter.status = req.query.status;
-    const events = await Event.find(filter).sort({ startDate: -1 });
+    const events = await Event.find(filter).sort({ startAt: -1 });
     res.json(events);
   } catch (err) {
     handleError(res, err);
@@ -122,16 +137,22 @@ const createEvent = async (req, res) => {
     if (error) return res.status(400).json({ message: error });
 
     const { user } = req;
+    const owner = await findOwner(user, req.body.organizerId);
+
+    // admin events are published straight away. organizer events wait for approval
+    // unless the admin gave that organizer the "publish without approval" permission.
+    const needsApproval = user.role !== 'admin' && approvalRequired() && !user.autoApprove;
+
     const event = await Event.create({
       ...data,
-      organizer: user._id,
-      organizerName: user.name,
-      organizerType: user.role === 'admin' ? 'college' : user.role,
-      status: approvalRequired() && user.role !== 'admin' ? 'pending' : 'approved',
+      ...ownerFields(owner),
+      createdBy: user._id,
+      status: needsApproval ? 'pending' : 'approved',
     });
 
     res.status(201).json(event);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message });
     handleError(res, err);
   }
 };
@@ -153,6 +174,12 @@ const updateEvent = async (req, res) => {
       if (data[field] !== undefined) event[field] = data[field];
     });
 
+    // only the admin can move an event to a different organizer
+    if (req.user.role === 'admin' && req.body.organizerId !== undefined) {
+      const owner = await findOwner(req.user, req.body.organizerId);
+      Object.assign(event, ownerFields(owner));
+    }
+
     // winners only make sense for competitive events
     if (event.eventType === 'non-competitive') {
       event.winners = [];
@@ -167,6 +194,7 @@ const updateEvent = async (req, res) => {
     await event.save();
     res.json(event);
   } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message });
     handleError(res, err);
   }
 };

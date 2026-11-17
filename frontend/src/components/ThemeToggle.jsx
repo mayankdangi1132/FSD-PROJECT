@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 
 // light / dark mode button.
 // the starting theme is already set by a small script in index.html so the page doesn't flash white.
@@ -18,12 +19,12 @@ const ThemeToggle = () => {
 
   return (
     <button
-      className="theme-btn"
+      className="icon-btn"
       onClick={toggleTheme}
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       aria-label="Toggle dark mode"
     >
-      {theme === 'dark' ? '☀️' : '🌙'}
+      {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   );
 };

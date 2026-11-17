@@ -10,7 +10,7 @@ import EventDetails from './pages/EventDetails';
 import CalendarPage from './pages/CalendarPage';
 import Organizers from './pages/Organizers';
 import Login from './pages/Login';
-import Register from './pages/Register';
+import Settings from './pages/Settings';
 import StudentDashboard from './pages/StudentDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import OrganizerDashboard from './pages/OrganizerDashboard';
@@ -19,6 +19,9 @@ import ManageWinners from './pages/ManageWinners';
 import NotFound from './pages/NotFound';
 
 const ORGANIZER_ROLES = ['admin', 'club', 'department'];
+
+// shorter way to write a protected route
+const only = (roles, page) => <ProtectedRoute roles={roles}>{page}</ProtectedRoute>;
 
 function App() {
   const { pathname } = useLocation();
@@ -33,58 +36,27 @@ function App() {
       <Navbar />
       <main>
         <Routes>
+          {/* public */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/clubs" element={<Organizers role="club" />} />
+          <Route path="/departments" element={<Organizers role="department" />} />
 
-          {/* everything below needs a college account (student, organizer or admin) */}
-          <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
-          <Route path="/events/:id" element={<ProtectedRoute><EventDetails /></ProtectedRoute>} />
-          <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
-          <Route path="/clubs" element={<ProtectedRoute><Organizers role="club" /></ProtectedRoute>} />
-          <Route path="/departments" element={<ProtectedRoute><Organizers role="department" /></ProtectedRoute>} />
-          <Route path="/student" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+          {/* any logged in college account */}
+          <Route path="/events" element={only(null, <Events />)} />
+          <Route path="/events/:id" element={only(null, <EventDetails />)} />
+          <Route path="/calendar" element={only(null, <CalendarPage />)} />
+          <Route path="/settings" element={only(null, <Settings />)} />
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute roles={['admin']}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute roles={['club', 'department']}>
-                <OrganizerDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/events/new"
-            element={
-              <ProtectedRoute roles={ORGANIZER_ROLES}>
-                <EventForm />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/events/:id/edit"
-            element={
-              <ProtectedRoute roles={ORGANIZER_ROLES}>
-                <EventForm />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/events/:id/winners"
-            element={
-              <ProtectedRoute roles={ORGANIZER_ROLES}>
-                <ManageWinners />
-              </ProtectedRoute>
-            }
-          />
+          {/* one dashboard per role - the backend checks the role again on every request */}
+          <Route path="/student" element={only(['student'], <StudentDashboard />)} />
+          <Route path="/admin/:section?" element={only(['admin'], <AdminDashboard />)} />
+          <Route path="/dashboard/:section?" element={only(['club', 'department'], <OrganizerDashboard />)} />
+
+          {/* event management (admin, clubs, departments) */}
+          <Route path="/events/new" element={only(ORGANIZER_ROLES, <EventForm />)} />
+          <Route path="/events/:id/edit" element={only(ORGANIZER_ROLES, <EventForm />)} />
+          <Route path="/events/:id/winners" element={only(ORGANIZER_ROLES, <ManageWinners />)} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

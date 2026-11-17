@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ImagePlus } from 'lucide-react';
 import { uploadImage, getError } from '../api';
 
 // picks an image, uploads it right away and gives the url back to the parent
@@ -30,14 +31,18 @@ const ImageUpload = ({ value, onChange, small = false }) => {
   return (
     <div className={small ? 'image-upload small' : 'image-upload'}>
       {value && <img src={value} alt="Preview" className="upload-preview" />}
-      <input type="file" accept="image/png, image/jpeg, image/webp, image/gif" onChange={handleFile} disabled={uploading} />
-      {uploading && <small>Uploading...</small>}
-      {error && <small className="error-text">{error}</small>}
+      <label className="upload-btn">
+        <ImagePlus size={17} />
+        {uploading ? 'Uploading...' : value ? 'Change image' : 'Choose image'}
+        <input type="file" accept="image/png, image/jpeg, image/webp, image/gif" onChange={handleFile} disabled={uploading} hidden />
+      </label>
       {value && !uploading && (
-        <button type="button" className="link-btn" onClick={() => onChange('')}>
-          Remove image
+        <button type="button" className="link-btn danger" onClick={() => onChange('')}>
+          Remove
         </button>
       )}
+      <small className="hint">JPG, PNG, WEBP or GIF, up to 5 MB</small>
+      {error && <small className="error-text">{error}</small>}
     </div>
   );
 };

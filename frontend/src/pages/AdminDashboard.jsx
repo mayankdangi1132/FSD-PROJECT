@@ -1,326 +1,172 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import {
+  Shapes,
+  Building2,
+  GraduationCap,
+  CalendarDays,
+  CalendarClock,
+  CheckCircle2,
+  Hourglass,
+  UserX,
+  Plus,
+  Search,
+} from 'lucide-react';
 import API, { getError } from '../api';
+import { useFeedback } from '../context/FeedbackContext';
+import DashboardLayout from '../components/DashboardLayout';
 import EventTable from '../components/EventTable';
+import AccountManager from '../components/AccountManager';
+import StudentManager from '../components/StudentManager';
+import { Loader } from '../components/States';
 
-const emptyForm = { name: '', email: '', password: '', role: 'club', description: '' };
+const TITLES = {
+  overview: ['Admin Dashboard', 'Everything happening on Campus Connect at a glance.'],
+  events: ['All Events', 'Approve, edit or remove any event on the portal.'],
+  clubs: ['Club Management', 'Add clubs and manage their organizer logins.'],
+  departments: ['Department Management', 'Add departments and manage their organizer logins.'],
+  students: ['Student Accounts', 'Create and manage student logins.'],
+};
+
+const StatCard = ({ icon: Icon, label, value, tone = 'blue', to }) => {
+  const content = (
+    <>
+      <span className={`stat-icon ${tone}`}>
+        <Icon size={20} />
+      </span>
+      <div>
+        <b>{value}</b>
+        <span>{label}</span>
+      </div>
+    </>
+  );
+  return to ? (
+    <Link to={to} className="stat">
+      {content}
+    </Link>
+  ) : (
+    <div className="stat">{content}</div>
+  );
+};
 
 const AdminDashboard = () => {
-  const [stats, setStats] = useState(null);
-  const [organizers, setOrganizers] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [tab, setTab] = useState('organizers');
-  const [statusFilter, setStatusFilter] = useState('');
+  const { section = 'overview' } = useParams();
+  const { toast, confirm } = useFeedback();
 
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState(null);
-  const [message, setMessage] = useState({ type: '', text: '' });
+  const [stats, setStats] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   const loadStats = () => API.get('/dashboard/admin').then((res) => setStats(res.data));
-  const loadOrganizers = () => API.get('/users').then((res) => setOrganizers(res.data));
   const loadEvents = () => API.get('/events/admin/all').then((res) => setEvents(res.data));
-  const loadStudents = () => API.get('/users/students').then((res) => setStudents(res.data));
 
   useEffect(() => {
-    Promise.all([loadStats(), loadOrganizers(), loadEvents(), loadStudents()]).catch((err) =>
-      setMessage({ type: 'error', text: getError(err) })
-    );
+    Promise.all([loadStats(), loadEvents()])
+      .catch((err) => toast(getError(err), 'error'))
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const resetForm = () => {
-    setForm(emptyForm);
-    setEditingId(null);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage({ type: '', text: '' });
-    try {
-      if (editingId) {
-        const body = { ...form };
-        if (!body.password) delete body.password; // keep old password
-        await API.put(`/users/${editingId}`, body);
-        setMessage({ type: 'success', text: 'Account updated' });
-      } else {
-        await API.post('/users', form);
-        setMessage({ type: 'success', text: `Account created for ${form.name}` });
-      }
-      resetForm();
-      loadOrganizers();
-      loadStats();
-      loadEvents(); // organizer name may have changed on events
-    } catch (err) {
-      setMessage({ type: 'error', text: getError(err) });
-    }
-  };
-
-  const startEdit = (org) => {
-    setEditingId(org._id);
-    setForm({ name: org.name, email: org.email, password: '', role: org.role, description: org.description || '' });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // enable / disable works the same for organizers and students
-  const toggleActive = async (account) => {
-    try {
-      await API.put(`/users/${account._id}`, { isActive: !account.isActive });
-      account.role === 'student' ? loadStudents() : loadOrganizers();
-    } catch (err) {
-      alert(getError(err));
-    }
-  };
-
-  const deleteStudent = async (student) => {
-    if (!window.confirm(`Delete the account of ${student.name}?`)) return;
-    try {
-      await API.delete(`/users/${student._id}`);
-      loadStudents();
-      loadStats();
-    } catch (err) {
-      alert(getError(err));
-    }
-  };
-
-  const deleteOrganizer = async (org) => {
-    if (!window.confirm(`Delete ${org.name}? All of their events will also be deleted.`)) return;
-    try {
-      await API.delete(`/users/${org._id}`);
-      loadOrganizers();
-      loadEvents();
-      loadStats();
-    } catch (err) {
-      alert(getError(err));
-    }
+  const refresh = () => {
+    loadStats();
+    loadEvents();
   };
 
   const deleteEvent = async (event) => {
-    if (!window.confirm(`Delete "${event.title}"?`)) return;
+    if (!(await confirm(`"${event.title}" and its winners will be deleted permanently.`, { title: 'Delete event?' }))) return;
     try {
       await API.delete(`/events/${event._id}`);
-      loadEvents();
-      loadStats();
+      toast('Event deleted');
+      refresh();
     } catch (err) {
-      alert(getError(err));
+      toast(getError(err), 'error');
     }
   };
 
-  const changeStatus = async (id, status) => {
+  const changeStatus = async (event, status) => {
     try {
-      await API.patch(`/events/${id}/status`, { status });
-      loadEvents();
-      loadStats();
+      await API.patch(`/events/${event._id}/status`, { status });
+      toast(status === 'approved' ? `"${event.title}" is now published` : `"${event.title}" was rejected`);
+      refresh();
     } catch (err) {
-      alert(getError(err));
+      toast(getError(err), 'error');
     }
   };
 
-  const shownEvents = statusFilter ? events.filter((e) => e.status === statusFilter) : events;
+  const pending = events.filter((e) => e.status === 'pending');
+  const shownEvents = events.filter(
+    (e) => (!statusFilter || e.status === statusFilter) && e.title.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const [title, subtitle] = TITLES[section] || TITLES.overview;
 
   return (
-    <div className="container page">
-      <div className="page-head row">
-        <div>
-          <h1>Admin Dashboard</h1>
-          <p>Manage organizer accounts and every event on the portal.</p>
-        </div>
-        <Link to="/events/new" className="btn btn-primary">
-          + Create College Event
-        </Link>
-      </div>
-
-      {stats && (
-        <div className="stats">
-          <div className="stat">
-            <b>{stats.totalClubs}</b>Clubs
-          </div>
-          <div className="stat">
-            <b>{stats.totalDepartments}</b>Departments
-          </div>
-          <div className="stat">
-            <b>{stats.totalStudents}</b>Students
-          </div>
-          <div className="stat">
-            <b>{stats.totalEvents}</b>Total Events
-          </div>
-          <div className="stat">
-            <b>{stats.upcoming}</b>Upcoming
-          </div>
-          <div className="stat">
-            <b>{stats.completed}</b>Completed
-          </div>
-          <div className={stats.pending > 0 ? 'stat highlight' : 'stat'}>
-            <b>{stats.pending}</b>Pending Approval
-          </div>
-        </div>
-      )}
-
-      {message.text && <p className={`alert ${message.type}`}>{message.text}</p>}
-
-      <div className="tabs">
-        <button className={tab === 'organizers' ? 'tab active' : 'tab'} onClick={() => setTab('organizers')}>
-          Organizer Accounts
-        </button>
-        <button className={tab === 'students' ? 'tab active' : 'tab'} onClick={() => setTab('students')}>
-          Students
-        </button>
-        <button className={tab === 'events' ? 'tab active' : 'tab'} onClick={() => setTab('events')}>
-          All Events {stats?.pending > 0 && <span className="count">{stats.pending}</span>}
-        </button>
-      </div>
-
-      {tab === 'organizers' && (
-        <>
-          <form className="box form-grid" onSubmit={handleSubmit}>
-            <h2 className="full">{editingId ? 'Edit Account' : 'Add Club / Department Account'}</h2>
-            <label>
-              Name
-              <input name="name" value={form.name} onChange={handleChange} placeholder="e.g. Robotics Club" required />
-            </label>
-            <label>
-              Official email
-              <input
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="robotics@college.edu"
-                required
-              />
-            </label>
-            <label>
-              {editingId ? 'New password (leave empty to keep)' : 'Password'}
-              <input
-                name="password"
-                type="text"
-                value={form.password}
-                onChange={handleChange}
-                minLength={6}
-                required={!editingId}
-              />
-            </label>
-            <label>
-              Type
-              <select name="role" value={form.role} onChange={handleChange}>
-                <option value="club">Club</option>
-                <option value="department">Department</option>
-              </select>
-            </label>
-            <label className="full">
-              Short description
-              <input name="description" value={form.description} onChange={handleChange} />
-            </label>
-            <div className="full form-actions">
-              <button className="btn btn-primary">{editingId ? 'Update Account' : 'Create Account'}</button>
-              {editingId && (
-                <button type="button" className="btn btn-outline" onClick={resetForm}>
-                  Cancel
-                </button>
-              )}
+    <DashboardLayout
+      title={title}
+      subtitle={subtitle}
+      actions={
+        (section === 'overview' || section === 'events') && (
+          <Link to="/events/new" className="btn btn-primary">
+            <Plus size={16} /> Create Event
+          </Link>
+        )
+      }
+    >
+      {section === 'overview' &&
+        (loading || !stats ? (
+          <Loader />
+        ) : (
+          <>
+            <div className="stats">
+              <StatCard icon={Shapes} label="Clubs" value={stats.totalClubs} to="/admin/clubs" />
+              <StatCard icon={Building2} label="Departments" value={stats.totalDepartments} tone="teal" to="/admin/departments" />
+              <StatCard icon={GraduationCap} label="Students" value={stats.totalStudents} tone="purple" to="/admin/students" />
+              <StatCard icon={CalendarDays} label="Total events" value={stats.totalEvents} to="/admin/events" />
+              <StatCard icon={CalendarClock} label="Upcoming" value={stats.upcoming} tone="teal" />
+              <StatCard icon={CheckCircle2} label="Completed" value={stats.completed} tone="slate" />
+              <StatCard icon={Hourglass} label="Waiting for approval" value={stats.pending} tone="amber" />
+              <StatCard icon={UserX} label="Inactive accounts" value={stats.inactiveAccounts} tone="red" />
             </div>
-          </form>
 
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Type</th>
-                  <th>Events</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {organizers.map((org) => (
-                  <tr key={org._id}>
-                    <td className="table-title">{org.name}</td>
-                    <td>{org.email}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{org.role}</td>
-                    <td>{org.eventCount}</td>
-                    <td>
-                      <span className={`pill ${org.isActive ? 'approved' : 'rejected'}`}>
-                        {org.isActive ? 'Active' : 'Disabled'}
-                      </span>
-                    </td>
-                    <td className="actions">
-                      <button className="btn btn-sm btn-outline" onClick={() => startEdit(org)}>
-                        Edit
-                      </button>
-                      <button className="btn btn-sm btn-warning" onClick={() => toggleActive(org)}>
-                        {org.isActive ? 'Disable' : 'Enable'}
-                      </button>
-                      <button className="btn btn-sm btn-danger" onClick={() => deleteOrganizer(org)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {organizers.length === 0 && <p className="empty">No organizer accounts yet.</p>}
-          </div>
-        </>
-      )}
+            <div className="panel">
+              <div className="panel-head">
+                <div>
+                  <h2>Waiting for approval</h2>
+                  <p className="muted">Events submitted by clubs and departments. Only approved events are visible to students.</p>
+                </div>
+              </div>
+              <EventTable events={pending} onDelete={deleteEvent} onStatusChange={changeStatus} showOrganizer />
+            </div>
+          </>
+        ))}
 
-      {tab === 'students' && (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>USN</th>
-                <th>Department</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s) => (
-                <tr key={s._id}>
-                  <td className="table-title">{s.name}</td>
-                  <td>{s.email}</td>
-                  <td>{s.usn}</td>
-                  <td>{s.department || '-'}</td>
-                  <td>
-                    <span className={`pill ${s.isActive ? 'approved' : 'rejected'}`}>
-                      {s.isActive ? 'Active' : 'Disabled'}
-                    </span>
-                  </td>
-                  <td className="actions">
-                    <button className="btn btn-sm btn-warning" onClick={() => toggleActive(s)}>
-                      {s.isActive ? 'Disable' : 'Enable'}
-                    </button>
-                    <button className="btn btn-sm btn-danger" onClick={() => deleteStudent(s)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {students.length === 0 && <p className="empty">No students have signed up yet.</p>}
-        </div>
-      )}
-
-      {tab === 'events' && (
-        <>
-          <div className="filters small">
+      {section === 'events' && (
+        <div className="panel">
+          <div className="toolbar">
+            <div className="search-box">
+              <Search size={16} />
+              <input placeholder="Search events..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All statuses</option>
-              <option value="pending">Pending</option>
+              <option value="pending">Pending ({pending.length})</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
             </select>
           </div>
-          <EventTable events={shownEvents} onDelete={deleteEvent} onStatusChange={changeStatus} showOrganizer />
-        </>
+          {loading ? (
+            <Loader />
+          ) : (
+            <EventTable events={shownEvents} onDelete={deleteEvent} onStatusChange={changeStatus} showOrganizer />
+          )}
+        </div>
       )}
-    </div>
+
+      {section === 'clubs' && <AccountManager role="club" onChange={refresh} />}
+      {section === 'departments' && <AccountManager role="department" onChange={refresh} />}
+      {section === 'students' && <StudentManager onChange={loadStats} />}
+    </DashboardLayout>
   );
 };
 

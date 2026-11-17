@@ -1,31 +1,30 @@
 const User = require('../models/User');
 const Event = require('../models/Event');
-const { todayStr, isCompleted, handleError } = require('../utils/helpers');
-
-// splits a list of events into upcoming / completed counts
-const countByTime = (events) => {
-  const completed = events.filter(isCompleted).length;
-  return { upcoming: events.length - completed, completed };
-};
+const { todayStr, addDays, isCompleted, handleError } = require('../utils/helpers');
 
 // GET /api/dashboard/admin
 const getAdminStats = async (req, res) => {
   try {
-    const [clubs, departments, students, events, pending] = await Promise.all([
+    const now = new Date();
+    const [clubs, departments, students, totalEvents, upcoming, pending, inactive] = await Promise.all([
       User.countDocuments({ role: 'club' }),
       User.countDocuments({ role: 'department' }),
       User.countDocuments({ role: 'student' }),
-      Event.find().select('endDate endTime'),
+      Event.countDocuments(),
+      Event.countDocuments({ endAt: { $gte: now } }),
       Event.countDocuments({ status: 'pending' }),
+      User.countDocuments({ role: { $ne: 'admin' }, isActive: false }),
     ]);
 
     res.json({
       totalClubs: clubs,
       totalDepartments: departments,
       totalStudents: students,
-      totalEvents: events.length,
-      ...countByTime(events),
+      totalEvents,
+      upcoming,
+      completed: totalEvents - upcoming,
       pending,
+      inactiveAccounts: inactive,
     });
   } catch (err) {
     handleError(res, err);
@@ -36,13 +35,15 @@ const getAdminStats = async (req, res) => {
 const getOrganizerStats = async (req, res) => {
   try {
     const events = await Event.find({ organizer: req.user._id });
+    const completed = events.filter(isCompleted);
 
     // competitive events that are over but still have no winners added
-    const needWinners = events.filter((e) => e.eventType === 'competitive' && isCompleted(e) && e.winners.length === 0);
+    const needWinners = completed.filter((e) => e.eventType === 'competitive' && e.winners.length === 0);
 
     res.json({
       totalEvents: events.length,
-      ...countByTime(events),
+      upcoming: events.length - completed.length,
+      completed: completed.length,
       pending: events.filter((e) => e.status === 'pending').length,
       needWinners: needWinners.map((e) => ({ _id: e._id, title: e.title, endDate: e.endDate })),
     });
@@ -54,19 +55,26 @@ const getOrganizerStats = async (req, res) => {
 // GET /api/dashboard/student  (any logged in user)
 const getStudentDashboard = async (req, res) => {
   try {
-    const upcomingList = await Event.find({ status: 'approved', endDate: { $gte: todayStr() } })
-      .sort({ startDate: 1, startTime: 1 })
-      .limit(10);
-    const upcoming = upcomingList.filter((e) => !isCompleted(e)).slice(0, 6);
+    const now = new Date();
+    const today = todayStr();
+    const weekEnd = addDays(today, 6);
+    const published = { status: 'approved' };
 
-    const recent = await Event.find({ status: 'approved' }).sort({ createdAt: -1 }).limit(6);
+    const [upcoming, recent, todayEvents, thisWeek, completed, recentWinners] = await Promise.all([
+      Event.find({ ...published, endAt: { $gte: now } }).sort({ startAt: 1 }).limit(6),
+      Event.find(published).sort({ createdAt: -1 }).limit(6),
+      // happening today (multi-day events count on every day they run)
+      Event.find({ ...published, startDate: { $lte: today }, endDate: { $gte: today } }).sort({ startAt: 1 }),
+      // anything running in the next 7 days
+      Event.find({ ...published, startDate: { $lte: weekEnd }, endAt: { $gte: now } }).sort({ startAt: 1 }),
+      Event.find({ ...published, endAt: { $lt: now } }).sort({ endAt: -1 }).limit(6),
+      Event.find({ ...published, 'winners.0': { $exists: true } })
+        .sort({ winnersPublishedAt: -1 })
+        .limit(5)
+        .select('title organizerName endDate winners winnersPublishedAt'),
+    ]);
 
-    const recentWinners = await Event.find({ status: 'approved', 'winners.0': { $exists: true } })
-      .sort({ winnersPublishedAt: -1 })
-      .limit(5)
-      .select('title organizerName endDate winners winnersPublishedAt');
-
-    res.json({ upcoming, recent, recentWinners });
+    res.json({ upcoming, recent, today: todayEvents, thisWeek, completed, recentWinners });
   } catch (err) {
     handleError(res, err);
   }

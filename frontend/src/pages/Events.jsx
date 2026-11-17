@@ -1,20 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Search, CalendarSearch } from 'lucide-react';
 import API, { getError } from '../api';
 import EventCard from '../components/EventCard';
 import OrganizerSelect from '../components/OrganizerSelect';
+import { Loader, EmptyState } from '../components/States';
 import { CATEGORIES } from '../utils/helpers';
+
+const TABS = [
+  ['upcoming', 'Upcoming'],
+  ['completed', 'Completed & results'],
+  ['all', 'All events'],
+];
+
+const emptyFilters = { search: '', organizer: '', category: '', date: '', when: 'all' };
 
 const Events = () => {
   const [params] = useSearchParams();
 
+  // filters can come from the URL (student dashboard search, club pages, home page)
   const [filters, setFilters] = useState({
-    search: '',
+    search: params.get('search') || '',
     organizer: params.get('organizer') || '',
     category: params.get('category') || '',
     date: '',
-    // coming from a club page we show all their events, otherwise only upcoming
-    when: params.get('organizer') ? 'all' : 'upcoming',
+    when: params.get('when') || (params.get('organizer') || params.get('search') ? 'all' : 'upcoming'),
   });
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,30 +51,26 @@ const Events = () => {
 
   const update = (field, value) => setFilters({ ...filters, [field]: value });
 
-  const clearFilters = () => setFilters({ search: '', organizer: '', category: '', date: '', when: 'all' });
-
   return (
     <div className="container page">
       <div className="page-head">
         <h1>Events</h1>
-        <p>Search and filter events from all clubs, departments and the college.</p>
+        <p>Search and filter events from every club, department and the college.</p>
       </div>
 
       <div className="tabs">
-        {['upcoming', 'completed', 'all'].map((w) => (
-          <button key={w} className={filters.when === w ? 'tab active' : 'tab'} onClick={() => update('when', w)}>
-            {w === 'upcoming' ? 'Upcoming' : w === 'completed' ? 'Completed' : 'All Events'}
+        {TABS.map(([value, label]) => (
+          <button key={value} className={filters.when === value ? 'tab active' : 'tab'} onClick={() => update('when', value)}>
+            {label}
           </button>
         ))}
       </div>
 
       <div className="filters">
-        <input
-          type="text"
-          placeholder="Search by event name..."
-          value={filters.search}
-          onChange={(e) => update('search', e.target.value)}
-        />
+        <div className="search-box">
+          <Search size={16} />
+          <input placeholder="Search by event name..." value={filters.search} onChange={(e) => update('search', e.target.value)} />
+        </div>
         <OrganizerSelect value={filters.organizer} onChange={(v) => update('organizer', v)} />
         <select value={filters.category} onChange={(e) => update('category', e.target.value)}>
           <option value="">All categories</option>
@@ -73,7 +79,7 @@ const Events = () => {
           ))}
         </select>
         <input type="date" value={filters.date} onChange={(e) => update('date', e.target.value)} title="Events on this date" />
-        <button className="btn btn-outline" onClick={clearFilters}>
+        <button className="btn btn-outline" onClick={() => setFilters(emptyFilters)}>
           Clear
         </button>
       </div>
@@ -81,9 +87,9 @@ const Events = () => {
       {error && <p className="alert error">{error}</p>}
 
       {loading ? (
-        <p className="loading">Loading events...</p>
+        <Loader text="Loading events..." />
       ) : events.length === 0 ? (
-        <p className="empty">No events match your filters.</p>
+        <EmptyState icon={CalendarSearch} title="No events found" text="Try changing or clearing the filters." />
       ) : (
         <>
           <p className="result-count">

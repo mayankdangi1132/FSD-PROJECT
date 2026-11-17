@@ -1,35 +1,69 @@
 import { Link } from 'react-router-dom';
-import { TYPE_COLORS, formatDateRange, formatTime, eventStatus } from '../utils/helpers';
+import { CalendarDays, Clock, MapPin } from 'lucide-react';
+import { TYPE_COLORS, formatDateRange, formatEventTime, eventStatus } from '../utils/helpers';
+
+export const CATEGORY_ICONS = {
+  Technical: '💻',
+  Cultural: '🎭',
+  Sports: '🏏',
+  Workshop: '🛠️',
+  Seminar: '🎤',
+  Competition: '🏆',
+  Other: '📌',
+};
+
+// shown when an event has no poster
+export const PosterPlaceholder = ({ category, big = false }) => (
+  <div className={`poster-placeholder cat-${category.toLowerCase()}${big ? ' big' : ''}`}>
+    <span>{CATEGORY_ICONS[category]}</span>
+    {category}
+  </div>
+);
 
 const EventCard = ({ event }) => {
   const status = eventStatus(event);
+  const statusClass = status === 'Completed' ? 'done' : status === 'Upcoming' ? 'soon' : 'live';
 
   return (
-    <Link to={`/events/${event._id}`} className="event-card" style={{ borderTopColor: TYPE_COLORS[event.organizerType] }}>
-      <div className="event-card-img">
+    <article className="event-card">
+      <Link to={`/events/${event._id}`} className="event-card-img">
         {event.poster ? (
           <img src={event.poster} alt={event.title} loading="lazy" />
         ) : (
-          <div className={`poster-placeholder cat-${event.category.toLowerCase()}`}>{event.category}</div>
+          <PosterPlaceholder category={event.category} />
         )}
-        <span className={`status-badge ${status === 'Completed' ? 'done' : status === 'Upcoming' ? 'soon' : 'live'}`}>
-          {status}
-        </span>
-      </div>
+        <span className={`status-badge ${statusClass}`}>{status}</span>
+      </Link>
 
       <div className="event-card-body">
-        <span className="category-tag">{event.category}</span>
-        <h3>{event.title}</h3>
-        <p className="meta">📅 {formatDateRange(event)}</p>
-        <p className="meta">
-          🕒 {formatTime(event.startTime)} - {formatTime(event.endTime)}
-        </p>
-        <p className="meta">📍 {event.venue}</p>
-        <p className="organizer" style={{ color: TYPE_COLORS[event.organizerType] }}>
-          {event.organizerName}
-        </p>
+        <div className="card-tags">
+          <span className="chip">{event.category}</span>
+          <span className="organizer-name" style={{ '--dot': TYPE_COLORS[event.organizerType] }}>
+            {event.organizerName}
+          </span>
+        </div>
+
+        <h3>
+          <Link to={`/events/${event._id}`}>{event.title}</Link>
+        </h3>
+
+        <ul className="meta-list">
+          <li>
+            <CalendarDays size={15} /> {formatDateRange(event)}
+          </li>
+          <li>
+            <Clock size={15} /> {formatEventTime(event)}
+          </li>
+          <li>
+            <MapPin size={15} /> {event.venue}
+          </li>
+        </ul>
+
+        <Link to={`/events/${event._id}`} className="btn btn-light-blue btn-block">
+          View Details
+        </Link>
       </div>
-    </Link>
+    </article>
   );
 };
 

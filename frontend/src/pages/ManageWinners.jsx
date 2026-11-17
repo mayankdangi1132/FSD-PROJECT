@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import API, { getError } from '../api';
+import { useFeedback } from '../context/FeedbackContext';
+import DashboardLayout from '../components/DashboardLayout';
 import ImageUpload from '../components/ImageUpload';
+import { Loader } from '../components/States';
 import { formatDateRange, isCompleted, ordinal } from '../utils/helpers';
 
 const newWinner = (position) => ({
@@ -17,6 +21,7 @@ const newWinner = (position) => ({
 const ManageWinners = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useFeedback();
 
   const [event, setEvent] = useState(null);
   const [winners, setWinners] = useState([]);
@@ -52,72 +57,51 @@ const ManageWinners = () => {
     setSaving(true);
     try {
       await API.put(`/events/${id}/winners`, { winners: filled });
+      toast(filled.length ? 'Winners published' : 'Winners cleared');
       navigate(`/events/${id}`);
     } catch (err) {
       setError(getError(err));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div className="container page"><p className="loading">Loading...</p></div>;
-  if (!event) return <div className="container page"><p className="alert error">{error}</p></div>;
-
   const backLink = (
-    <Link to={`/events/${id}`} className="back-link">
-      ← Back to event
+    <Link to={`/events/${id}`} className="btn btn-outline btn-sm">
+      <ArrowLeft size={15} /> Back to event
     </Link>
   );
 
-  if (event.eventType !== 'competitive') {
-    return (
-      <div className="container page narrow">
-        {backLink}
-        <p className="alert warning">This is a non-competitive event, so it does not have winners.</p>
-      </div>
+  let content;
+  if (loading) content = <Loader />;
+  else if (!event) content = <p className="alert error">{error}</p>;
+  else if (event.eventType !== 'competitive') {
+    content = <p className="alert warning">This is a non-competitive event, so it does not have winners.</p>;
+  } else if (!isCompleted(event)) {
+    content = (
+      <p className="alert warning">
+        This event is not over yet ({formatDateRange(event)}). You can add winners once it is completed.
+      </p>
     );
-  }
-
-  if (!isCompleted(event)) {
-    return (
-      <div className="container page narrow">
-        {backLink}
-        <h1>Winners - {event.title}</h1>
-        <p className="alert warning">
-          This event is not over yet ({formatDateRange(event)}). You can add winners once it is completed.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container page narrow">
-      {backLink}
-      <h1>Winners - {event.title}</h1>
-      <p className="muted">Fill in the winners and press save. They will show up on the event page.</p>
-
-      {error && <p className="alert error">{error}</p>}
-
+  } else {
+    content = (
       <form onSubmit={handleSave}>
+        {error && <p className="alert error">{error}</p>}
+
         {winners.map((w, i) => (
-          <div key={i} className="box winner-form">
-            <div className="winner-form-head">
-              <h3>{w.position ? ordinal(Number(w.position)) : '?'} Place</h3>
-              <button type="button" className="link-btn danger" onClick={() => removeRow(i)}>
-                Remove
+          <div key={i} className="panel winner-form">
+            <div className="panel-head">
+              <h2>{w.position ? `${ordinal(Number(w.position))} place` : 'Position?'}</h2>
+              <button type="button" className="btn btn-sm btn-danger-soft" onClick={() => removeRow(i)}>
+                <Trash2 size={14} /> Remove
               </button>
             </div>
 
-            <div className="form-grid">
+            <div className="form-grid three">
               <label>
                 Position *
-                <input
-                  type="number"
-                  min="1"
-                  value={w.position}
-                  onChange={(e) => updateWinner(i, 'position', e.target.value)}
-                  required
-                />
+                <input type="number" min="1" value={w.position} onChange={(e) => updateWinner(i, 'position', e.target.value)} required />
               </label>
               <label>
                 Winner name *
@@ -149,14 +133,24 @@ const ManageWinners = () => {
 
         <div className="form-actions">
           <button type="button" className="btn btn-outline" onClick={addRow}>
-            + Add another winner
+            <Plus size={16} /> Add another winner
           </button>
           <button className="btn btn-primary" disabled={saving}>
             {saving ? 'Saving...' : 'Save Winners'}
           </button>
         </div>
       </form>
-    </div>
+    );
+  }
+
+  return (
+    <DashboardLayout
+      title={event ? `Winners · ${event.title}` : 'Winners'}
+      subtitle="Rows left without a name are ignored."
+      actions={backLink}
+    >
+      {content}
+    </DashboardLayout>
   );
 };
 

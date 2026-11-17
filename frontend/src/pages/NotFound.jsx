@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
+import { MapPinOff } from 'lucide-react';
+import { EmptyState } from '../components/States';
 
 const NotFound = () => (
-  <div className="container page center">
-    <h1>404</h1>
-    <p>We couldn't find that page.</p>
-    <Link to="/" className="btn btn-primary">
-      Go Home
-    </Link>
+  <div className="container page">
+    <EmptyState icon={MapPinOff} title="Page not found" text="The page you are looking for does not exist.">
+      <Link to="/" className="btn btn-primary">
+        Go home
+      </Link>
+    </EmptyState>
   </div>
 );
 

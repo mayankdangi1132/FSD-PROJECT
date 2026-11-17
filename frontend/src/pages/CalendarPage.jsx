@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import API, { getError } from '../api';
 import EventCalendar from '../components/EventCalendar';
 import OrganizerSelect from '../components/OrganizerSelect';
+import { Loader } from '../components/States';
 import { CATEGORIES, TYPE_COLORS } from '../utils/helpers';
 
 const CalendarPage = () => {
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState(null);
   const [organizer, setOrganizer] = useState('');
   const [category, setCategory] = useState('');
   const [error, setError] = useState('');
@@ -17,7 +18,7 @@ const CalendarPage = () => {
   }, []);
 
   // filtering on the client since we already have all events
-  const filtered = events.filter((e) => {
+  const filtered = (events || []).filter((e) => {
     if (category && e.category !== category) return false;
     if (organizer === 'college') return e.organizerType === 'college';
     if (organizer) return e.organizer === organizer;
@@ -28,7 +29,7 @@ const CalendarPage = () => {
     <div className="container page">
       <div className="page-head">
         <h1>Event Calendar</h1>
-        <p>Click on any event to see its full details.</p>
+        <p>All times are in IST. Click any event to see its full details.</p>
       </div>
 
       <div className="filters calendar-filters">
@@ -58,7 +59,7 @@ const CalendarPage = () => {
 
       {error && <p className="alert error">{error}</p>}
 
-      <EventCalendar events={filtered} />
+      {events ? <EventCalendar events={filtered} /> : !error && <Loader text="Loading calendar..." />}
     </div>
   );
 };
